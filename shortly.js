@@ -23,10 +23,19 @@ app.use(partials());
 
 // Parse JSON (uniform resource locators)
 app.use(bodyParser.json());
-
+var restricted = {
+  '/login': false,
+  '/signup': false,
+  '/logout': false,
+  '/': true,
+  '/links': true,
+  '/index': true,
+  '/create': true,
+  '/client':true
+};
 app.use('/', function(req, res, next) {
-  if ( !req.url.match(/^\/(login|signup)/) ) {
-      console.log(req.url);
+  
+  if ( restricted[req.url] ) {
     if ( req.session.user ) {
       next();
     } else {
@@ -66,7 +75,7 @@ function(req, res) {
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
-    console.log('Not a valid url: ', uri);
+    
     return res.send(404);
   }
 
@@ -76,7 +85,7 @@ function(req, res) {
     } else {
       util.getUrlTitle(uri, function(err, title) {
         if (err) {
-          console.log('Error reading URL heading: ', err);
+          
           return res.send(404);
         }
 
@@ -98,6 +107,16 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/logout', function(req, res) {
+  
+  req.session.destroy(function(err) {
+    
+    
+  });
+  
+  res.redirect('/');
+});
+
 app.get('/login', function(req, res) {
   res.render('login');
 });
