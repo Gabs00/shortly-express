@@ -1,7 +1,9 @@
 var express = require('express');
+var session = require('express-session');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var auth = require('./app/helpers/auth-helpers.js');
 
 
 var db = require('./app/config');
@@ -13,11 +15,30 @@ var Click = require('./app/models/click');
 
 var app = express();
 
+app.use(session({secret: 'keyboard cat'}));
+
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
 app.use(partials());
+
 // Parse JSON (uniform resource locators)
 app.use(bodyParser.json());
+
+app.use('/', function(req, res, next) {
+  if ( !req.url.match(/^\/(login|signup)/) ) {
+      console.log(req.url);
+    if ( req.session.user ) {
+      next();
+    } else {
+      req.session.error = 'Access Denied!';
+      res.redirect('/login');
+    }
+  } else {
+    next();
+  }
+});
+
+
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
@@ -77,9 +98,57 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+app.get('/login', function(req, res) {
+  res.render('login');
+});
 
+app.post('/login', function(req, res) {
+  var data = req.body;
+  // check to see if user exists
+  new User({username: data.username}).fetch().then(function(found) {
+    if (found) {
+      var temp = new User(data)
+      if ( temp.get('password') === found.get('password') ) {
+        req.session.user = found.get('username');
+        res.redirect('/');
+      } else {
+        res.redirect('/login');
+      }
+    } else {
+      res.redirect('/login');
+      
+    }
+  });
+  // if not, so sorry
+  // if it does, compare passwords
+});
 
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
 
+app.post('/signup', function(req, res) {
+  var data = req.body;
+  var valid = auth.validateNewUser(data);
+  if(valid){
+    //do some sql
+    new User({username:data.username}).fetch().then(function(found){
+      if(found){
+        //respond tht usrnam is taken
+      } else {
+        //do stuff
+        var user = new User(data);
+        user.save().then(function(newUser){
+          req.session.user = newUser.get('username');
+          res.redirect('/');
+        });
+      }
+    });
+  } else {
+    res.writeHead(400);
+    res.end('Invalid username or password');
+  }
+});
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
 // assume the route is a short code and try and handle it here.
